@@ -3,7 +3,8 @@
 这是一个功能全面的桌面端人脸识别系统，采用 Python 和 Tkinter 构建。系统集成了两种主流的人脸识别技术路线：基于传统特征工程的**支持向量机 (SVM)** 和基于深度学习的**卷积神经网络 (CNN)**。用户可以通过图形化界面轻松完成数据集加载、模型训练、性能评估、模型对比和实时识别等一系列操作。
 
   
-![Uploading image.png…]()
+![image](https://github.com/user-attachments/assets/f8a73cbe-7793-49c8-a327-ba84f8ba5a2f)
+
 
 
 ## ✨ 主要功能
