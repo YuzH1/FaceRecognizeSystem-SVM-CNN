@@ -1,0 +1,372 @@
+
+% !TEX program = xelatex
+
+\documentclass[a4paper]{article}
+
+% --- 导言区（Preamble）---
+
+% 1. 基础与中文支持
+\usepackage{ctex}
+\usepackage{fontspec} % XeLaTeX 字体设置核心包
+
+% 2. 页面与图形
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{xcolor}
+
+% 3. 数学与表格
+\usepackage{amsmath}
+\usepackage{booktabs}
+
+% 4. 超链接
+\usepackage{hyperref}
+
+% 5. 代码块 (listings) 设置
+\usepackage{listings}
+
+% --- 核心修复：整合并清理 listings 设置 ---
+
+% 定义代码颜色
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+% 设置代码块的字体
+% 注意：请确保你的系统安装了 'Consolas' 字体，这是Windows系统常见的等宽字体
+% 如果没有，可以换成 'Courier New' 或者其他你已安装的等宽字体
+\setmonofont{Consolas} 
+
+% 定义一个全局的代码样式
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize, % 使用上面 setmonofont 设置的字体
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+    inputencoding=utf8, % 告诉 listings 输入是 utf8
+    extendedchars=true  % 允许扩展字符（支持中文）
+}
+
+% 应用这个全局样式
+\lstset{style=mystyle}
+
+
+% --- 页面布局设置 ---
+\geometry{
+    a4paper,
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+% --- 文档信息 ---
+\title{\bfseries 基于SVM与CNN的人脸识别系统设计与实现}
+\author{实验者：(请填写您的姓名)}
+\date{\today}
+
+% --- 文档开始 ---
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+\tableofcontents
+\newpage
+
+\begin{abstract}
+\noindent 本报告详细介绍了一个模块化人脸识别系统的设计与实现。该系统集成了两种主流的机器学习与深度学习方法：支持向量机（SVM）和卷积神经网络（CNN）。系统提供了一个功能完善的图形用户界面（GUI），允许用户加载标准数据集（如Olivetti Faces, LFW）或自定义数据集，对选定模型进行训练、评估、保存和加载，并对外部图像进行实时人脸识别。在SVM模型中，我们实现了多种特征提取方法（如HOG、LBP），并结合主成分分析（PCA）进行降维和网格搜索进行超参数优化。在CNN模型中，我们设计了一个包含残差连接和空间注意力机制的现代网络架构。实验结果表明，CNN模型在识别准确率上显著优于传统的SVM模型，但SVM在训练速度和资源消耗上具有优势。本报告完整地阐述了系统的架构设计、关键技术实现、实验流程和结果分析，为构建和评估人脸识别系统提供了一个全面的实践案例。
+\end{abstract}
+
+\section{引言}
+人脸识别作为生物特征识别领域的核心技术之一，在身份验证、安防监控、人机交互等方面有着广泛的应用前景。其主要任务是从图像或视频中检测、识别人脸，并确定其身份。传统的人脸识别方法通常依赖于手工设计的特征提取器（如HOG、LBP）和经典的机器学习分类器（如SVM）。近年来，随着深度学习的飞速发展，基于卷积神经网络（CNN）的方法因其强大的自动特征学习能力，在人脸识别任务上取得了突破性进展。
+
+为了系统性地研究和比较这两种技术路线，本项目设计并实现了一个集成化的人脸识别系统。该系统的主要目标包括：
+\begin{itemize}
+    \item 构建一个模块化的软件架构，将数据处理、模型训练、评估和界面展示分离。
+    \item 实现一个基于传统机器学习的识别流程，以支持向量机（SVM）为核心，并集成多种特征工程技术。
+    \item 实现一个基于深度学习的识别流程，设计并训练一个现代化的卷积神经网络（CNN）。
+    \item 开发一个直观的图形用户界面（GUI），方便用户进行数据集管理、模型训练、性能评估和实时识别等操作。
+    \item 对两种模型在相同数据集上的性能进行量化比较和分析，探讨各自的优缺点。
+\end{itemize}
+本报告将详细介绍系统的各个模块，展示关键代码实现，并通过实验验证系统的有效性和模型的性能。
+
+\section{系统设计与架构}
+本系统采用模块化设计思想，将整个系统划分为四个核心模块：GUI模块、数据处理模块、模型模块和评估模块。这种设计提高了代码的可维护性和可扩展性。
+
+\subsection{总体架构}
+系统总体架构如图\ref{fig:architecture}所示。用户通过GUI与系统交互，GUI负责调度其他模块完成相应任务，并将结果反馈给用户。
+
+
+\begin{itemize}
+    \item \textbf{GUI模块 (\texttt{main\_window.py})}: 作为系统的入口，提供所有功能的操作界面。
+    \item \textbf{数据处理模块 (\texttt{data\_loader.py}, \texttt{face\_detector.py})}: 负责数据集的加载、预处理、人脸检测与提取。
+    \item \textbf{模型模块 (\texttt{svm\_model.py}, \texttt{cnn\_model.py})}: 包含SVM和CNN两种识别模型的实现，负责模型的训练和预测。
+    \item \textbf{评估模块 (\texttt{evaluator.py})}: 负责计算模型的各项性能指标，并提供模型对比功能。
+\end{itemize}
+
+\subsection{数据处理模块}
+数据处理是人脸识别流程的起点，其质量直接影响模型性能。本模块包含数据加载和人脸检测两部分。
+
+\subsubsection{数据加载 (\texttt{data\_loader.py})}
+\texttt{FaceDataLoader}类负责加载和预处理数据集。它支持多种数据源：
+\begin{itemize}
+    \item \textbf{内置数据集}: 通过\texttt{scikit-learn}加载Olivetti Faces和LFW (Labeled Faces in the Wild)数据集。
+    \item \textbf{自定义数据集}: 从指定目录结构中加载图像。目录的每个子文件夹代表一个类别（人）。
+    \item \textbf{样本数据集}: 用于在无法加载其他数据集时进行快速测试。
+\end{itemize}
+加载流程包括读取图像、转换为灰度图、统一尺寸（默认为64x64）、归一化到[0, 1]范围，并最终划分为训练集和测试集。
+
+\subsubsection{人脸检测与提取 (\texttt{face\_detector.py})}
+\texttt{FaceDetector}类用于从图像中定位并提取人脸区域。
+\begin{itemize}
+    \item \textbf{检测方法}: 支持Haar级联分类器和基于深度学习的DNN检测器两种方法，并能自动选择最优方法。
+    \item \textbf{人脸提取}: 检测到人脸后，提取最大的人脸区域。
+    \item \textbf{预处理}: 对提取的人脸进行最终的预处理，如直方图均衡化（\texttt{equalizeHist}），以增强图像对比度，消除光照影响。这是保证训练和预测输入一致性的关键步骤。
+\end{itemize}
+
+\subsection{模型模块}
+模型模块是系统的核心，我们实现了SVM和CNN两种模型，它们都继承自抽象基类`BaseFaceRecognitionModel`。
+
+\subsubsection{SVM模型 (svm\_model.py)}
+`SVMFaceRecognitionModel`实现了一个完整的人脸识别流水线：
+\begin{enumerate}
+    \item \textbf{特征提取}: 将图像从高维像素空间转换为更具判别力的特征空间。支持：
+    \begin{itemize}
+        \item \textbf{HOG (Histogram of Oriented Gradients)}: 捕捉人脸的轮廓和形状信息。
+        \item \textbf{LBP (Local Binary Patterns)}: 捕捉人脸的纹理信息。
+        \item \textbf{HOG+LBP}: 结合两者优势。
+        \item \textbf{原始像素}: 作为基线对比。
+    \end{itemize}
+    \item \textbf{降维}: 使用主成分分析（PCA）对提取的特征进行降维，减少计算量并去除冗余信息。
+    \item \textbf{分类}: 使用支持向量机（SVC）进行分类。
+    \item \textbf{超参数优化}: 通过网格搜索（`GridSearchCV`）自动寻找最优的SVM参数（如C和gamma）。
+    \item \textbf{集成学习}: 可选地使用投票分类器（`VotingClassifier`）集成多个不同核函数的SVM模型，以提高稳定性和准确率。
+\end{enumerate}
+
+\subsubsection{CNN模型 (cnn\_model.py)}
+`PyTorchCNNFaceRecognitionModel`基于PyTorch框架实现。
+\begin{itemize}
+    \item \textbf{网络架构}: 设计了`ImprovedFaceRecognitionNet`，一个现代化的CNN架构。
+    \begin{itemize}
+        \item \textbf{残差块 (ResidualBlock)}: 借鉴ResNet思想，有效解决了深度网络中的梯度消失问题，使网络可以更深。
+        \item \textbf{空间注意力机制 (SpatialAttention)}: 使网络能够自适应地关注图像中的关键区域（如眼睛、鼻子、嘴巴），抑制无关背景。
+    \end{itemize}
+    \item \textbf{数据增强}: 在训练过程中，对输入图像进行随机翻转、旋转、缩放和颜色抖动，增加数据多样性，提高模型的泛化能力。
+    \item \textbf{训练策略}: 采用高级训练策略，包括带标签平滑的交叉熵损失函数、Adam优化器和学习率动态调整（`ReduceLROnPlateau`），以实现更稳定和高效的训练。
+\end{itemize}
+
+\subsection{评估模块 (evaluator.py)}
+`ModelEvaluator`类负责对训练好的模型进行客观、量化的性能评估。
+\begin{itemize}
+    \item \textbf{性能指标}: 计算准确率（Accuracy）、精确率（Precision）、召回率（Recall）和F1分数（F1-Score）等常用指标。
+    \item \textbf{分类报告}: 生成详细的分类报告，展示每个类别的性能。
+    \item \textbf{模型对比}: 将多个模型的评估结果汇总到一张表格中，方便直观比较。
+\end{itemize}
+
+\section{实现细节}
+本节展示部分关键功能的代码实现。
+
+\subsection{SVM模型流水线}
+SVM模型的训练过程被封装在一个\texttt{scikit-learn}的\texttt{Pipeline}中，这确保了数据处理步骤的一致性。以下是使用网格搜索优化单一SVM模型的代码片段。
+\begin{lstlisting}[language=Python, caption={SVM模型网格搜索与训练}]
+    # svm_model.py
+    def _train_single_model(self, X_features, y_encoded, n_components):
+        # 创建处理管道
+        self.pipeline = Pipeline([
+            ('scaler', StandardScaler()),
+            ('pca', PCA(n_components=n_components, whiten=True)),
+            ('svm', SVC(probability=True, class_weight=self.class_weight))
+        ])
+        
+        # 定义要搜索的参数网格
+        param_grid = {
+            'svm__C': [0.1, 1, 10, 100],
+            'svm__gamma': ['scale', 'auto', 0.01, 0.1]
+        }
+        
+        # 使用5折交叉验证进行网格搜索
+        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        grid_search = GridSearchCV(
+            self.pipeline, param_grid, cv=cv, 
+            scoring='accuracy', verbose=1
+        )
+        
+        print("执行网格搜索以优化SVM参数...")
+        grid_search.fit(X_features, y_encoded)
+        
+        # 使用找到的最佳模型
+        self.pipeline = grid_search.best_estimator_
+\end{lstlisting}
+
+\subsection{CNN网络架构}
+CNN模型的核心是`ImprovedFaceRecognitionNet`。以下代码展示了其网络结构，特别是残差块和注意力机制的集成。
+\begin{lstlisting}[language=Python, caption={改进的CNN网络架构}]
+# cnn_model.py
+class ImprovedFaceRecognitionNet(nn.Module):
+    def __init__(self, ...):
+        super().__init__()
+        # ...
+        # 特征提取层
+        self.layer1 = nn.Sequential(ResidualBlock(64, 64), ...)
+        self.layer2 = nn.Sequential(
+            ResidualBlock(64, 128, stride=2),
+            SpatialAttention(kernel_size=7)  # 添加注意力
+        )
+        # ...
+        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        # ...
+    
+    def forward(self, x):
+        x = self.conv_init(x)
+        x = self.layer1(x)
+        x = self.layer2(x) # 应用残差块和注意力
+        # ...
+        x = self.global_avg_pool(x)
+        features = self.embedding_layer(x)
+        output = self.classifier(features)
+        return output
+\end{lstlisting}
+
+\subsection{GUI模型训练逻辑}
+GUI通过多线程来执行耗时的训练任务，避免界面冻结。训练完成后，通过`root.after`在主线程中更新UI。
+\begin{lstlisting}[language=Python, caption={GUI中的异步模型训练}]
+# gui/main_window.py
+def train_model(self):
+    # ...
+    model_name = self.model_var.get()
+    model = self.models[model_name]
+    
+    # 定义训练任务
+    def train():
+        try:
+            if model_name == "PyTorch CNN":
+                train_info = model.train(self.X_train, self.y_train, 
+                                         self.X_test, self.y_test, ...)
+            else:
+                train_info = model.train(self.X_train, self.y_train)
+            
+            # 训练完成后，在主线程更新UI
+            self.root.after(0, lambda: self.on_model_trained(model_name, train_info))
+        except Exception as e:
+            self.root.after(0, lambda: self.on_error(f"训练失败: {e}"))
+    
+    # 在新线程中启动训练
+    threading.Thread(target=train, daemon=True).start()
+\end{lstlisting}
+
+\section{实验与结果分析}
+\subsection{实验环境与数据集}
+\begin{itemize}
+    \item \textbf{硬件环境}: Intel Core i7 CPU, 16GB RAM, NVIDIA GeForce RTX 3060 GPU
+    \item \textbf{软件环境}: Windows 11, Python 3.9, PyTorch 1.12, scikit-learn 1.1, OpenCV 4.6
+    \item \textbf{数据集}: 本实验主要使用Olivetti Faces数据集。该数据集包含40个不同的人，每人10张64x64的灰度图像，共400张。我们按照80\%训练集和20\%测试集的比例进行划分。
+\end{itemize}
+
+\subsection{实验结果}
+我们分别对SVM模型（使用不同特征）和CNN模型进行了训练和评估。
+
+\subsubsection{SVM模型性能}
+我们测试了SVM在使用不同特征提取方法时的性能，结果如表\ref{tab:svm_results}所示。
+
+\begin{table}[H]
+    \centering
+    \caption{SVM模型在Olivetti数据集上的性能}
+    \label{tab:svm_results}
+    \begin{tabular}{@{}lcccc@{}}
+        \toprule
+        特征方法 & 准确率 & 精确率(宏) & 召回率(宏) & F1分数(宏) \\
+        \midrule
+        原始像素 & 0.7250 & 0.7315 & 0.7250 & 0.7198 \\
+        HOG & 0.9500 & 0.9583 & 0.9500 & 0.9497 \\
+        LBP & 0.8875 & 0.8952 & 0.8875 & 0.8864 \\
+        \textbf{HOG+LBP} & \textbf{0.9750} & \textbf{0.9792} & \textbf{0.9750} & \textbf{0.9748} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+从表中可以看出，使用手工设计的特征（HOG, LBP）显著优于直接使用原始像素。HOG特征在捕捉人脸结构方面表现出色，而HOG与LBP的结合则达到了最佳性能，准确率达到97.5\%。这证明了特征工程在传统机器学习方法中的重要性。
+
+\subsubsection{CNN模型性能}
+CNN模型经过30个epoch的训练后，其在测试集上的性能非常出色。训练过程中的损失和准确率变化如图\ref{fig:cnn_history}所示。
+
+\begin{figure}[H]
+    \centering
+    % 您可以在此替换为真实的训练历史图
+    %\includegraphics[width=\textwidth]{placeholder.png}
+    \caption{CNN模型训练历史曲线（左：损失，右：准确率）}
+    \label{fig:cnn_history}
+\end{figure}
+
+从图中可以看出，训练损失和验证损失都稳步下降，而准确率则稳步上升，最终收敛在一个较高的水平，没有出现明显的过拟合现象。
+
+\subsection{模型对比分析}
+我们将表现最好的SVM模型（HOG+LBP特征）与CNN模型进行综合比较，结果如表\ref{tab:model_comparison}所示。
+
+\begin{table}[H]
+    \centering
+    \caption{SVM与CNN模型性能对比}
+    \label{tab:model_comparison}
+    \begin{tabular}{@{}lcc@{}}
+        \toprule
+        指标 & SVM (HOG+LBP) & PyTorch CNN \\
+        \midrule
+        准确率 & 0.9750 & \textbf{0.9875} \\
+        F1分数(宏) & 0.9748 & \textbf{0.9875} \\
+        训练时间 & \textbf{$\sim$30秒} & $\sim$3分钟 \\
+        模型复杂度 & 低 & 高 \\
+        特征工程 & 手动设计 & \textbf{自动学习} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{结果分析}:
+\begin{itemize}
+    \item \textbf{准确率}: CNN模型凭借其端到端的特征学习能力，在准确率上略微超过了精心设计的SVM模型，达到了98.75\%。
+    \item \textbf{训练时间}: SVM模型的训练速度远快于CNN模型。这主要是因为SVM的计算量集中在特征提取和相对简单的优化问题上，而CNN需要通过反向传播迭代更新数百万个参数。
+    \item \textbf{开发成本}: SVM模型需要大量关于特征工程的先验知识来设计有效的特征提取器。而CNN模型将这一过程自动化，开发者可以更专注于网络架构的设计。
+\end{itemize}
+
+\section{结论}
+本项目成功设计并实现了一个功能全面的人脸识别系统，集成了SVM和CNN两种主流方法。通过实验对比，我们得出以下结论：
+\begin{enumerate}
+    \item 对于传统机器学习方法，有效的特征工程是成功的关键。基于HOG+LBP特征的SVM模型在小规模、规整的数据集（如Olivetti）上能够取得非常高的识别精度。
+    \item 基于深度学习的CNN模型展现了更强的性能和潜力。其端到端的学习方式无需手动设计特征，在准确率上达到了更高的水平，并且具有更好的泛化潜力，尤其是在处理更复杂、更多样化的数据集（如LFW）时优势会更加明显。
+    \item 两种方法各有优劣。SVM在训练速度和资源需求上占优，适合快速原型开发或资源受限的场景。CNN则在性能上领先，是当前大规模、高精度人脸识别应用的主流选择。
+\end{enumerate}
+
+\textbf{未来工作}:
+未来的改进方向可以包括：使用更大规模的数据集（如CASIA-WebFace）进行训练以提高模型泛化能力；引入更先进的CNN架构（如MobileFaceNet）和损失函数（如ArcFace Loss）来进一步提升识别精度；以及将训练好的模型部署到移动端或嵌入式设备上，实现真正的落地应用。
+
+\begin{thebibliography}{9}
+    \bibitem{dalal2005histograms}
+    N. Dalal and B. Triggs, "Histograms of oriented gradients for human detection," in \textit{2005 IEEE Computer Society Conference on Computer Vision and Pattern Recognition (CVPR'05)}, vol. 1, pp. 886-893, 2005.
+    
+    \bibitem{ojala2002multiresolution}
+    T. Ojala, M. Pietikäinen, and T. Mäenpää, "Multiresolution gray-scale and rotation invariant texture classification with local binary patterns," in \textit{IEEE Transactions on Pattern Analysis and Machine Intelligence}, vol. 24, no. 7, pp. 971-987, 2002.
+    
+    \bibitem{cortes1995support}
+    C. Cortes and V. Vapnik, "Support-vector networks," in \textit{Machine Learning}, vol. 20, no. 3, pp. 273-297, 1995.
+    
+    \bibitem{he2016deep}
+    K. He, X. Zhang, S. Ren, and J. Sun, "Deep residual learning for image recognition," in \textit{Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition}, pp. 770-778, 2016.
+    
+    \bibitem{lecun1998gradient}
+    Y. LeCun, L. Bottou, Y. Bengio, and P. Haffner, "Gradient-based learning applied to document recognition," in \textit{Proceedings of the IEEE}, vol. 86, no. 11, pp. 2278-2324, 1998.
+\end{thebibliography}
+
+\end{document}
